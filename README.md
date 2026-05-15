@@ -1,6 +1,6 @@
 # claude-questionnaire-skill
 
-A reusable questionnaire widget for Claude's Visualizer, loaded via CDN. Renders a configurable multi-page form with 7-point Likert ratings, free-text responses, and optional notes, then returns structured results to Claude via `sendPrompt`.
+A reusable questionnaire widget for Claude's Visualizer, loaded via CDN. Renders a configurable multi-page form with 7-point Likert ratings, free-text responses, and optional notes. On submit, returns structured results to Claude via `sendPrompt`, offers a JSON download button to the user, and (in hosts that support it) lets the skill write the result to disk.
 
 Seed use case is a daily evening check-in. The widget is intended for any questionnaire-shaped artifact (weekly review, post-mortem, mood log, etc.) that fits the same response shapes.
 
@@ -96,13 +96,27 @@ The Next button is disabled when current-page items are missing input; Submit on
 
 ## Output
 
-On submit, the widget calls:
+On submit, the widget delivers the result in up to three ways, depending on the host:
+
+### 1. Chat-out via `sendPrompt` (always)
 
 ```js
 sendPrompt("questionnaire:" + JSON.stringify(payload))
 ```
 
-where `payload` echoes the full `configuration` and `questions`, plus:
+The canonical interface. Every host that can render the widget can receive this. Downstream skills and consumers should read from here.
+
+### 2. In-widget Download JSON button (always)
+
+The submit acknowledgement screen renders a **Download JSON** button. Clicking it constructs a Blob and triggers a browser download named `{slugified-title}_{YYYY-MM-DD_HH-mm-ss}.json`. The user controls where the file lands. Works in any host that can render the widget — no host file-write tool required.
+
+### 3. Direct disk write by the skill (host-dependent)
+
+When the skill runs in a host with file-write capability (Cowork, Claude Code) and an output target is reachable, the skill writes the result JSON to disk at `configuration.outputPath` or a default path under a mounted root. See [SKILL.md §4](SKILL.md#4-output-handling) for the decision tree. In hosts without file access (Claude Chat web/app), this mode is skipped silently — modes 1 and 2 remain.
+
+### Payload shape
+
+`payload` echoes the full `configuration` and `questions`, plus:
 
 ```json
 {
