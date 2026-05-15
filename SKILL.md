@@ -6,12 +6,14 @@ description: >
   questionnaire", "present a questionnaire", or whenever another skill needs to
   collect structured input across one or more questions (with 7-point Likert
   ratings, free-text responses, and optional notes).
-  Renders via show_widget using a CDN-hosted widget; receives results back via
-  sendPrompt and (optionally) writes them to disk.
+  Renders via show_widget using a CDN-hosted widget. On submit, returns results
+  via sendPrompt (universal), offers an in-widget JSON download (universal),
+  and optionally writes the result file to disk (when the host supports it).
 compatibility: >
   Requires show_widget for inline rendering. CDN load from cdn.jsdelivr.net.
-  File write to disk is optional — used only when outputPath is provided or
-  a default output directory is available.
+  Direct file write to disk is optional — used only when outputPath is provided
+  or a default output directory is available. The in-widget Download JSON
+  button works in any host.
 ---
 
 # Questionnaire Skill
@@ -41,15 +43,20 @@ repo's [README](README.md).
 
 The skill is invoked with either:
 
-a. **Inline JSON** in the trigger message, e.g.:
+a. **Inline JSON** in the trigger message (always supported), e.g.:
    ```
    run questionnaire {"configuration": {...}, "questions": [...]}
    ```
-b. **A path to a JSON file** containing the same shape:
+b. **A path to a JSON file** containing the same shape (requires host file-read capability):
    ```
    run questionnaire ./path/to/checkin.json
    ```
-c. **Called by another skill** with the config object passed programmatically.
+c. **Called by another skill** with the config object passed programmatically (always supported).
+
+**Host-dependence:** option (b) only works in environments with a file-read
+tool (Cowork mode, Claude Code, etc.). In hosts without file access
+(Claude Chat web/app), a file path argument is refused with a clear error
+pointing at inline JSON as the alternative.
 
 Schema: see [README §Configuration](README.md#configuration).
 
@@ -113,23 +120,50 @@ echoed `configuration`, `questions`, the new `results[]` array, and `meta`
 
 ---
 
-## 4. Write the result to disk
+## 4. Output handling
 
-### When to write
+Three output modes, in order of universality.
 
-- If `configuration.outputPath` is set in the input: write there.
-- Else if a default output directory is available (e.g. a mounted OneDrive
-  folder under `PARA-meta`): write to:
-  ```
-  {output_root}/Questionnaire_results/{slugified_title}/YYYY-MM-DD_HH-mm-ss.json
-  ```
-- Else: skip the file write and surface a "no file written" notice.
+### A. Chat-out via `sendPrompt` (always)
 
-### How to write
+The widget calls `sendPrompt('questionnaire:' + JSON.stringify(payload))`
+on submit. The skill parses the JSON tail. This is the canonical interface
+and the durable record — every downstream consumer reads from here.
 
-Write the full payload as pretty-printed JSON (2-space indent). Create
-parent directories as needed. On write failure, surface the error path and
-the structured payload so the user can save it manually.
+### B. Download offer (always)
+
+The widget's submit acknowledgement renders a "Download JSON" button. When
+clicked, the widget constructs a Blob client-side and triggers a browser
+download. The user controls where the file lands.
+
+Works in any host that can render the widget. No host file-write tool
+required. The default filename is:
+```
+{slugified-title}_{YYYY-MM-DD_HH-mm-ss}.json
+```
+
+The skill does not need to do anything to enable this — it's part of the
+widget.
+
+### C. Direct disk write (opportunistic)
+
+When the host supports file write *and* an output target is reachable, the
+skill writes the result JSON to disk after the widget submission:
+
+1. **No file-write tool available** (e.g. Claude Chat web/app)
+   → skip silently. The user still has modes A and B.
+2. **`configuration.outputPath` set** → attempt to write there.
+   - On success: surface the path.
+   - On failure (path unwritable): surface the error. Modes A and B remain.
+3. **`outputPath` unset, a default root reachable** — e.g. a mounted
+   OneDrive folder containing `PARA-meta` — write to:
+   ```
+   {output_root}/Questionnaire_results/{slugified_title}/YYYY-MM-DD_HH-mm-ss.json
+   ```
+4. **`outputPath` unset, no default root reachable** → skip mode C.
+
+When writing applies, write the full payload as pretty-printed JSON
+(2-space indent), creating parent directories as needed.
 
 ### Slugification rule
 
@@ -137,20 +171,25 @@ the structured payload so the user can save it manually.
 hyphens, collapsed to single hyphens, trimmed. Example:
 `"Daily evening check-in — bounded fields"` → `daily-evening-check-in-bounded-fields`.
 
+The widget's download button uses the same rule, so download filenames
+and skill-written paths share a slug when both fire.
+
 ---
 
 ## 5. Confirmation
 
-After widget submission and (if applicable) file write, surface:
+After widget submission, surface a one-block confirmation:
 
 ```
 ✓ Questionnaire submitted: {title}
-  File: {outputPath or "not written"}
+  Disk write: {path | "skipped"}
+  Download: available in the widget (button on the submit screen)
   Results: {N answered}/{N total}
 ```
 
-Do not summarise individual answers. The file and the structured payload
-are the durable record; chat doesn't need to duplicate them.
+Do not summarise individual answers. The chat payload, the downloaded file
+(if the user clicks), and any disk-written file are the durable record;
+chat doesn't need to duplicate them.
 
 The structured payload remains in the conversation, so downstream skills
 (e.g. a future evening-checkin skill writing a synthesis paragraph) can
