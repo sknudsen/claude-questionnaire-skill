@@ -22,6 +22,8 @@
 //
 // On submit, calls sendPrompt('questionnaire:' + JSON.stringify(payload)) where
 // payload echoes configuration + questions and adds results[] and meta.
+// Also offers a Download JSON button on the submit acknowledgement — universal
+// across hosts (any browser context), no host file-write tool required.
 
 (function () {
   const LIKERT_LABELS = [
@@ -402,10 +404,53 @@
       frame.innerHTML = "";
       const box = document.createElement("div");
       box.className = "qw-result";
-      box.innerHTML = `<h3>Submitted</h3><p style="color:var(--color-text-secondary); margin:0 0 8px; font-size:12px;">Result sent to host via sendPrompt.</p><pre id="qw-result-json"></pre>`;
+      box.innerHTML =
+        `<h3>Submitted</h3>` +
+        `<p style="color:var(--color-text-secondary); margin:0 0 10px; font-size:12px;">Result sent to host via sendPrompt. You can also download the payload as a JSON file:</p>` +
+        `<button id="qw-download-btn" style="margin-bottom: 12px;">Download JSON</button>` +
+        `<pre id="qw-result-json"></pre>`;
       frame.appendChild(box);
       const pre = box.querySelector("#qw-result-json");
       if (pre) pre.textContent = JSON.stringify(payload, null, 2);
+
+      // Download button — universal across hosts; user controls where the file lands.
+      const btn = box.querySelector("#qw-download-btn");
+      if (btn) {
+        btn.addEventListener("click", () => {
+          const filename = slugifyTitle(config.configuration.title) + "_" + timestampForFilename(payload.meta.submittedAt) + ".json";
+          downloadJson(payload, filename);
+        });
+      }
+    }
+
+    function slugifyTitle(s) {
+      return String(s || "questionnaire")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 80);
+    }
+
+    function timestampForFilename(iso) {
+      // 2026-05-15T23:11:19.379Z → 2026-05-15_23-11-19
+      try {
+        return iso.replace(/\..*$/, "").replace("T", "_").replace(/:/g, "-");
+      } catch (e) {
+        return new Date().toISOString().replace(/\..*$/, "").replace("T", "_").replace(/:/g, "-");
+      }
+    }
+
+    function downloadJson(payload, filename) {
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      // Give the browser a moment to start the download before revoking.
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
     render();
