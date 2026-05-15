@@ -1,0 +1,65 @@
+{
+  "configuration": {
+    "title": "Daily evening check-in — bounded fields",
+    "intro": "Four Likert items and two open prompts. Notes are optional; text and ratings are required.",
+    "submitLabel": "Submit",
+    "pages": [
+      {
+        "id": "ratings",
+        "title": "How today felt",
+        "intro": "Four agreement items. The text is texture around the number, not a substitute for it.",
+        "questionIds": ["L1a", "L3a", "L7a", "L10"]
+      },
+      {
+        "id": "reflections",
+        "title": "What today took and gave",
+        "intro": "Two open prompts. Both are required.",
+        "questionIds": ["B1", "B2"]
+      }
+    ]
+  },
+  "questions": [
+    {
+      "id": "L1a",
+      "responseShape": "likert+text+note",
+      "prompt": "Today I had the energy I wished for.",
+      "charLimitText": 200,
+      "charLimitNote": 100
+    },
+    {
+      "id": "L3a",
+      "responseShape": "likert+text+note",
+      "prompt": "I worked on things that matter to me right now.",
+      "charLimitText": 200,
+      "charLimitNote": 100
+    },
+    {
+      "id": "L7a",
+      "responseShape": "likert+text+note",
+      "prompt": "I felt connected to people today (rather than isolated).",
+      "charLimitText": 200,
+      "charLimitNote": 100
+    },
+    {
+      "id": "L10",
+      "responseShape": "likert+text+note",
+      "prompt": "I felt like myself today.",
+      "charLimitText": 200,
+      "charLimitNote": 100
+    },
+    {
+      "id": "B1",
+      "responseShape": "text-only",
+      "prompt": "What did today take from me?",
+      "description": "\"Nothing today\" is a valid response.",
+      "charLimitText": 300
+    },
+    {
+      "id": "B2",
+      "responseShape": "text-only",
+      "prompt": "What did today give me?",
+      "description": "\"Nothing today\" is a valid response.",
+      "charLimitText": 300
+    }
+  ]
+}
